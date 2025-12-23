@@ -106,7 +106,7 @@ public class Main {
                 System.out.println("Actual:   " + outputOrder);
             }
             if (!isCorrectStats) {
-                System.out.println("Statistics (Wait/Turnaround) Mismatch");
+                System.out.println("Statistics (Wait/Turnaround/Quantum History[if AG]) Mismatch");
             }
         }
     }
