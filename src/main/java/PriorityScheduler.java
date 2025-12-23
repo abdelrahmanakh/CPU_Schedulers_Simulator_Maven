@@ -1,125 +1,138 @@
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.PriorityQueue;
 
 class PriorityScheduler {
     private List<String> executionOrder = new ArrayList<>();
+
+    private void applyAging(PriorityQueue<Process> queue, int time, int agingInterval) {
+        if (agingInterval <= 0 || queue.isEmpty())
+            return;
+        List<Process> temp = new ArrayList<>(queue);
+        queue.clear();
+        for (Process p : temp) {
+            if ((time - p.getArrivalTime()) % agingInterval == 0) {
+                p.setPriority(Math.max(1, p.getPriority() - 1));
+            }
+            queue.add(p);
+        }
+    }
+
     boolean is_unit_test;
-    PriorityScheduler(boolean is_unit_test){
+
+    PriorityScheduler(boolean is_unit_test) {
         this.is_unit_test = is_unit_test;
     }
+
     // get for print
     List<String> getExecutionOrder() {
         return executionOrder;
     }
-    public void schedule(List<Process> processes, int contextSwitching) {
-        // Reset all processes
-        for(Process pr : processes){
-            pr.reset();
+
+    public void schedule(List<Process> input, int contextSwitching, int ageInterval) {
+        List<Process> processes = new ArrayList<>();
+        for (Process p : input) {
+            p.reset(); 
+            p.setRemainingTime(p.getBurstTime());
+            processes.add(p);
         }
 
-        int currentTime = 0;
-        int completedProcesses = 0;
-        int size = processes.size();
-        Process lastProcess = null;
+        PriorityQueue<Process> readyQueue = new PriorityQueue<>((p1, p2) -> {
+            if (p1.getPriority() != p2.getPriority())
+                return Integer.compare(p1.getPriority(), p2.getPriority());
+            if (p1.getArrivalTime() != p2.getArrivalTime())
+                return Integer.compare(p1.getArrivalTime(), p2.getArrivalTime());
+            return p1.getName().compareTo(p2.getName());
+        });
 
-        final int ageIntreval = 2;
-        final int ageVlaue = 1;
+        processes.sort(Comparator.comparingInt(Process::getArrivalTime));
 
-        // Track for effective priority and wait time for age
-        java.util.Map<String, Integer> effectivePriority = new java.util.HashMap<>();
-        java.util.Map<String, Integer> waitCounter = new java.util.HashMap<>();
+        int currentTime = processes.get(0).getArrivalTime();
+        int i = 0;
 
-        // intialize them
-        for (Process pr : processes) {
-            effectivePriority.put(pr.getName(), pr.getPriority());
-            waitCounter.put(pr.getName(), 0);
+        while (i < processes.size() && processes.get(i).getArrivalTime() <= currentTime) {
+            readyQueue.add(processes.get(i));
+            i++;
         }
 
-        while(completedProcesses < size){
-            // arrived process and not complete
-            List<Process> readyQueue = new ArrayList<>();
-            for(Process pr : processes){
-                if(pr.getArrivalTime() <= currentTime && pr.getRemainingTime() > 0){
-                    readyQueue.add(pr);
+        String lastProcessName = "";
+        String lastExecutedName = "";
+        Map<String, Integer> finalEffectivePriorities = new HashMap<>();
+
+        while (!readyQueue.isEmpty() || i < processes.size()) {
+
+            Process current = null;
+            String currentName = "Null";
+
+            if (!readyQueue.isEmpty()) {
+                current = readyQueue.poll();
+                currentName = current.getName();
+
+                if (!currentName.equals(lastExecutedName)) {
+                    executionOrder.add(currentName);
+                    lastExecutedName = currentName;
                 }
             }
 
-            // no process ready
-            if (readyQueue.isEmpty()) {
-                currentTime++;
-                continue;
-            }
+            //  Context Switch 
+            if (!lastProcessName.isEmpty() && !lastProcessName.equals(currentName) && !lastProcessName.equals("Null")) {
+                if (current != null) readyQueue.add(current);
 
-            // raise age of processes
-            for (Process p : readyQueue) {
-                if (p != lastProcess && p.getRemainingTime() > 0) {
-                    int waiting = waitCounter.get(p.getName());
-                    waitCounter.put(p.getName(), waiting + 1);
-                    // reduce age and increase priority
-                    if ((waiting + 1) % ageIntreval == 0) {
-                        int currentPriority = effectivePriority.get(p.getName());
-                        int newPriority = Math.max(0, currentPriority - ageVlaue);
-                        effectivePriority.put(p.getName(), newPriority);
+                for (int c = 0; c < contextSwitching; c++) {
+                    currentTime++;
+                    applyAging(readyQueue, currentTime, ageInterval);
+                    
+                    while (i < processes.size() && processes.get(i).getArrivalTime() == currentTime) {
+                        readyQueue.add(processes.get(i));
+                        i++;
                     }
                 }
+                lastProcessName = currentName;
+                continue; 
             }
 
-            // highest process
-            Process highProcess = readyQueue.get(0);
-            for(Process pr : processes){
-                int anyPriot = effectivePriority.get(pr.getName());
-                int hPriot = effectivePriority.get(highProcess.getName());
+            lastProcessName = currentName;
 
-                if(anyPriot < hPriot){
-                    highProcess = pr;
-                } else if (anyPriot == hPriot){
-                    // choose by arrival time
-                    if(pr.getArrivalTime() < highProcess.getArrivalTime()){
-                        highProcess = pr;
-                    }
-                    // by name order
-                    else if(pr.getArrivalTime() == highProcess.getArrivalTime()){
-                        if(pr.getName().compareTo(highProcess.getName()) > 0){
-                            highProcess = pr;
-                        }
-                    }
-                }
-            }
-
-            // contezt switch if process changed
-            if(lastProcess != null && highProcess != lastProcess){
-                currentTime += contextSwitching;
-            }
-
-            // reset waiting counter for run process
-            waitCounter.put(highProcess.getName(), 0);
-
-            // extract one of processes
-            highProcess.setRemainingTime(highProcess.getRemainingTime() - 1);
             currentTime++;
-            executionOrder.add(highProcess.getName());
-            lastProcess = highProcess;
+            if (current != null) {
+                current.setRemainingTime(current.getRemainingTime() - 1);
+            }
 
-            // if process complete
-            if(highProcess.getRemainingTime() == 0){
-                completedProcesses++;
+            applyAging(readyQueue, currentTime, ageInterval);
 
-                highProcess.setCompletionTime(currentTime);
-                highProcess.setTurnaroundTime(
-                        highProcess.getCompletionTime() - highProcess.getArrivalTime()
-                );
-                highProcess.setWaitingTime(
-                        highProcess.getTurnaroundTime() - highProcess.getBurstTime()
-                );
+            while (i < processes.size() && processes.get(i).getArrivalTime() == currentTime) {
+                readyQueue.add(processes.get(i));
+                i++;
+            }
+
+            if (current == null) continue;
+
+            if (current.getRemainingTime() > 0) {
+                readyQueue.add(current);
+            } else {
+                current.setCompletionTime(currentTime);
+                current.setTurnaroundTime(current.getCompletionTime() - current.getArrivalTime());
+                current.setWaitingTime(current.getTurnaroundTime() - current.getBurstTime());
+                finalEffectivePriorities.put(current.getName(), current.getPriority());
             }
         }
+
+        for(Process p : processes) {
+            if(!finalEffectivePriorities.containsKey(p.getName())) {
+                finalEffectivePriorities.put(p.getName(), p.getPriority());
+            }
+        }
+
         if (!is_unit_test) {
-            printPriority(processes,executionOrder,effectivePriority);
+            printPriority(processes, executionOrder, finalEffectivePriorities);
         }
     }
 
-    private void printPriority(List<Process> processes, List<String> executionOrder, java.util.Map<String, Integer> effectivePriority){
+    private void printPriority(List<Process> processes, List<String> executionOrder,
+            java.util.Map<String, Integer> effectivePriority) {
         System.out.println("\n========== Priority Scheduling (Preemptive + Aging) ==========");
         System.out.println("Execution Order: " + executionOrder);
 
@@ -128,7 +141,6 @@ class PriorityScheduler {
         System.out.println("---------------------------------------------------------------");
 
         processes.sort(Comparator.comparing(Process::getName));
-
 
         for (Process pr : processes) {
             System.out.printf("%-10s %-18d %-18d\n",
