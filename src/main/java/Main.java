@@ -81,7 +81,7 @@ public class Main {
                 // Priority Testing
                 int agingInterval = data.input.agingInterval;
                 List<Process> pProcesses = convertToProcesses(data.input.processes);
-                PriorityScheduler ps = new PriorityScheduler(true);
+                PriorityScheduler ps = new PriorityScheduler(false);
                 ps.schedule(pProcesses, data.input.contextSwitch, agingInterval);
                 runAndVerify("Priority", fileName, pProcesses, ps.getExecutionOrder(), expectedOutput.get("Priority"));
 
