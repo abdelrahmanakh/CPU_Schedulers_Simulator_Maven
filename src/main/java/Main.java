@@ -79,11 +79,11 @@ public class Main {
                 runAndVerify("RR", fileName, rrProcesses, rr.getExecutionOrder(), expectedOutput.get("RR"));
                 
                 // Priority Testing
-//                int agingInterval = data.input.agingInterval;
-//                List<Process> pProcesses = convertToProcesses(data.input.processes);
-//                PriorityScheduler ps = new PriorityScheduler(false);
-//                ps.schedule(pProcesses, data.input.contextSwitch);
-//                runAndVerify("Priority", fileName, pProcesses, ps.getExecutionOrder(), expectedOutput.get("Priority"));
+                int agingInterval = data.input.agingInterval;
+                List<Process> pProcesses = convertToProcesses(data.input.processes);
+                PriorityScheduler ps = new PriorityScheduler(true);
+                ps.schedule(pProcesses, data.input.contextSwitch, agingInterval);
+                runAndVerify("Priority", fileName, pProcesses, ps.getExecutionOrder(), expectedOutput.get("Priority"));
 
                 System.out.println();
 
